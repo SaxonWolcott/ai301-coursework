@@ -92,16 +92,19 @@ This is also the basis for the claim comment you write in Unit 2.
 
 **Selection rationale**
 
-[Answer all three:
+Answer all three:
 
-1. The issue's fit to your interests and to the time available.
+1. **The issue's fit to your interests and to the time available.**
+
    I'm interested in this issue as I like language processing problems. It's in Python which I'm trying to practice more of and only revolves around a single function that already has tests made for it so it seems like my work is cut out for me.
-2. What the verdict identified correctly, and what you weighed that the rubric could
-   not.
+
+2. **What the verdict identified correctly, and what you weighed that the rubric could not.**
+
    All the rubric parts were correct and it identified the desire for Python and tests practice, and my proficiency in the safety/LLM layer based on my fit profile. The only thing it didn't really weigh is if I think the issue itself is interesting or seems fun.
-3. The anticipated difficulty in claiming it.
+
+3. **The anticipated difficulty in claiming it.**
+
    This seems like a very reasonable challenge since the existing function that has a bug isn't that long and this bug is in an area I feel confident in.
-   ]
 
 ---
 
