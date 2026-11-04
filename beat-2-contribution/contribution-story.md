@@ -1,4 +1,4 @@
-# Contribution: [Issue Title]
+# Contribution: Enhance a11y for `FileButton`
 
 Path: `beat-2-contribution/contribution-story.md`
 
@@ -8,11 +8,10 @@ format criteria grade exactly that. Your course repo link is the whole submissio
 files and no evidence uploads are part of Assignment 5.
 
 **Contribution Number:** [1]
-**Student:** [Student name]
-**GitHub Username:** [your GitHub username, exactly as it appears on your profile - no @, no
-profile URL. Your comments upstream are identified by this name.]
-**Issue:** [GitHub issue link]
-**Pull Request:** [GitHub PR link, once opened]
+**Student:** Saxon Wolcott
+**GitHub Username:** SaxonWolcott
+**Issue:** https://github.com/yamada-ui/yamada-ui/issues/7988
+**Pull Request:** not opened yet
 
 One repository, built across units 5 to 8, telling the whole story of your real
 contribution. Fill it as you work, not at the end — the sections below ask for evidence that
@@ -55,10 +54,19 @@ happened; these entries are the toolkit's own timeline.
 All four entries are graded. Keep every heading below, and fill each
 one in the week it belongs to.
 
-**Unit 5: [one line on the tool work]**
+**Unit 5: turned my issue-select skill into issue-scout and wrote its search strategy**
 
-[2-4 sentences: what you built (the scout, your strategy), what broke
-or fell short, what changed because of it.]
+I wrote three `gh search issues` queries from my fit profile (Python
+and TypeScript good-first-issues in AI and dev-tooling orgs, plus a
+test-focused query) and eight ranking filters. My first scan graded
+five issues and my rubric rejected all five on `not-taken`: each one
+already had open PRs, which my filters couldn't see because search
+results don't include linked PRs (three of the five even had zero
+comments). I added `-linked:pr` to every query, which showed that
+almost every good-first-issue in those AI orgs gets a PR within days
+(results dropped from 38 to 5 and from 30 to 0). So I moved to the
+Issue Selection site and checked its 893 Python/TypeScript issues for
+hidden claims before grading any of them.
 
 **Unit 6: [one line on the tool work]**
 
