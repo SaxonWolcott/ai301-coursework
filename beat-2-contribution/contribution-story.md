@@ -1,4 +1,4 @@
-# Contribution: Enhance a11y for `FileButton`
+# Contribution: Make the latency flush scheduler testable and cover its error-isolation arms
 
 Path: `beat-2-contribution/contribution-story.md`
 
@@ -10,7 +10,7 @@ files and no evidence uploads are part of Assignment 5.
 **Contribution Number:** [1]
 **Student:** Saxon Wolcott
 **GitHub Username:** SaxonWolcott
-**Issue:** https://github.com/yamada-ui/yamada-ui/issues/7988
+**Issue:** https://github.com/nimbus-agent/Nimbus/issues/976
 **Pull Request:** not opened yet
 
 One repository, built across units 5 to 8, telling the whole story of your real
@@ -88,24 +88,65 @@ drafted, what you did with the draft.]
 
 ## Why I Chose This Issue
 
-[1-2 paragraphs in your own words: how you searched, what your scan
-surfaced, what your scout's verdict said, why this issue fits your
-profile, and what you hope to learn. If your scout's verdict on it
-was reject and you chose it anyway, say so here and say why; choosing
-against your own tool silently is what loses points. Close with an
-honest read of the tool itself: where the scout fell short on a real
-wild search and what you changed or would change, or what convinced
-you it held up. **Record the link to your claim comment in this section too.**
-Not claimed yet? Write `claim pending` and today's date where the link goes,
-and add the link the moment your claim lands.]
+My scout's own GitHub search came up empty: all five issues it graded
+already had PRs, and after I filtered out linked PRs the AI orgs I'd
+targeted had almost nothing left. So I pulled the Python and TypeScript
+good-first-issues from the Issue Selection site, filtered out the ones
+with linked PRs or claim comments, and graded three survivors:
+yamada-ui#7988, nimbus-agent/Nimbus#976, and graphql-hive#1601. All
+three were accepted. I first claimed yamada-ui#7988 on Nov 4, but on
+Nov 6 the maintainer folded it into his own PR (#8006) with a related
+issue and merged it the same day, so I had to re-pick. I re-graded
+Nimbus#976 with my patched rubric on Nov 6 and again checked the
+thread on Nov 7: still accepted, with the difficulty note at
+**moderate**. That means one source file and two test files, a design
+choice I have to make and explain (how to make the 30-second timer
+tick reachable from a test), and a per-file branch-coverage floor of
+80% that the file only clears by 2.4 points. It fits me because it's
+TypeScript, my strongest language, in a large codebase, and the whole
+issue is about testing well, which is the thing I most want to learn.
+I want to come out of it knowing how to add a test seam without
+changing behavior, how Istanbul measures line and branch coverage, and
+how to "red-prove" a test so I know it can actually fail.
+
+The scout held up on the issues it graded, but a real search showed
+its gaps. The search step couldn't see linked PRs, so I added
+`-linked:pr` to every query. The old `reasonable-scope` check only
+looked at product decisions, so I replaced it with `scope-feasible`
+plus a difficulty note. Its `not-taken` check still depends on reading
+the whole thread, because claims hide in comments that search and
+regex miss. And nothing in it could have predicted a maintainer taking
+over the issue himself. It also has no check for review quality:
+Nimbus has one maintainer, who merges almost all of his own PRs, so
+the review I get will come from one person. If I patch it again, I'd
+add a preferred check for at least two distinct human mergers in the
+last ten merged PRs. Nimbus also requires signing a CLA that lets them
+relicense contributions, which my rubric doesn't look at either.
+
+Claim comment: https://github.com/nimbus-agent/Nimbus/issues/976#issuecomment-6714038487
 
 **Toolkit**
 
-- Tool: issue-scout (your scout: your search strategy, your rubric),
-  and how you used it
-- What it produced: [the scan and its verdict on this issue, described]
-- Difficulties: [where it fell short, or "none met" if none did]
-- What changed: [what you patched or would update, or "nothing"]
+- Tool: issue-scout (my search strategy, rubric, and fit profile).
+  I ran its three `gh search` queries first, then used it to grade
+  the issues I pulled from the Issue Selection site, and re-graded my
+  picks after patching the rubric.
+- What it produced: scan 1 rejected all five issues on `not-taken`;
+  the site sweep graded yamada-ui#7988, Nimbus#976, and
+  graphql-hive#1601 as accept; the Nov 6 re-pick accepted Nimbus#976
+  (difficulty: moderate) and rejected yamada-ui#6069 on `not-taken`
+  because it was assigned to someone else.
+- Difficulties: search results don't show linked PRs, so taken issues
+  looked free; `reasonable-scope` let big, vague issues through and
+  would have rejected anything with an open design question; and the
+  scout can't see claims that sit in comments, review quality, CLAs,
+  or a maintainer about to do the work himself (which is how I lost
+  yamada-ui#7988).
+- What changed: added `-linked:pr` to every query; applied the unit-6
+  scope patch, replacing `reasonable-scope` with `scope-feasible` and
+  adding the straightforward / moderate / ambitious difficulty note
+  (logged in scan-notes.md on Nov 4). I'd still add a preferred
+  check for at least two human mergers in the last ten merged PRs.
 
 ---
 
