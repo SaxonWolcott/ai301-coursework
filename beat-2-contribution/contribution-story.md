@@ -68,11 +68,19 @@ almost every good-first-issue in those AI orgs gets a PR within days
 Issue Selection site and checked its 893 Python/TypeScript issues for
 hidden claims before grading any of them.
 
-**Unit 6: [one line on the tool work]**
+**Unit 6: installed the voice guard and wrote a repo-memory file for Nimbus**
 
-[2-4 sentences: the voice-guard, the repo-memory file. What broke or
-fell short, and what changed because of it. "Nothing broke" counts when
-it is true - say how you know.]
+On Windows the voice guard broke three ways. Git Bash couldn't create the
+symlinks, so I used the pointer-file fallback. The hook command's `$HOME`
+never expanded, so the hook failed without logging anything until I gave it
+an absolute path. And Claude Code sometimes ran commands through PowerShell,
+which the Bash-only hook never saw, so I extended both the matcher and
+`check_voice.py` to cover PowerShell. After that, my Nimbus#976 claim went
+through the hook and logged a `pass` in `guard-log.md` on Nov 7. For
+`CLAUDE.local.md` I dropped the `@AGENTS.md` import, because Nimbus ships its
+own CLAUDE.md instead. I also skipped the orientation agent, since the
+subsystem is only four files, read them directly instead, and kept the notes
+to 46 lines.
 
 **Unit 7: [one line on the tool work]**
 
