@@ -189,31 +189,88 @@ Claim comment: https://github.com/nimbus-agent/Nimbus/issues/976#issuecomment-67
 
 **Environment Setup**
 
-[What a stranger would need to stand this up: your operating system,
-the relevant versions (language, runtime, package manager, the project
-itself), and how you set the project up. Then the challenges you faced
-and how you solved them, or that none came up.]
+- OS: Windows 11 Home 10.0.26200 on an ARM64 laptop, using Git Bash.
+- Runtime: Bun 1.4.4 (Nimbus needs Bun 1.2+, and its CI uses 1.4).
+- Project: my fork SaxonWolcott/Nimbus, cloned on `main` at
+  `7350b29e` (2026-11-07), then `bun install` (1034 packages, no
+  errors).
+
+Bun wasn't installed, so I installed it with
+`winget install Oven-sh.Bun`. The installer only updates PATH for new
+shells, so my open terminal couldn't find `bun` until I pointed PATH at
+the winget package folder. The test run also logs a warning that
+`sqlite-vec` is unsupported on win32-arm64; these tests don't use vector
+search, so it didn't matter.
 
 **Steps to Reproduce**
 
-1. [Step 1]
-2. [Step 2]
-3. [Observed result]
+1. From the clone root, run the issue's own Istanbul coverage command:
+   `rm -rf coverage`, then in `packages/gateway`
+   `bun test src/db test/unit/db/latency-ring-buffer.test.ts --preload ../../scripts/coverage/istanbul-register.ts --preload ../../scripts/coverage/report-coverage.ts`,
+   then back at the root `bun scripts/coverage/merge-coverage.ts`.
+2. Read the `SF:packages/gateway/src/db/latency-ring-buffer.ts` record
+   in `coverage/lcov.info` (`LF`/`LH`, `BRF`/`BRH`, and any
+   `DA:<line>,0`).
+3. Red-prove each error arm the way the issue asks: delete one
+   `try`/`catch` in `startLatencyFlushScheduler` (keeping the
+   `flushLatencyBuffer` call), run `bun test src/db/latency-ring-buffer`
+   from `packages/gateway`, then restore the file with `git checkout`.
+4. Observed result: the issue says the file is at 94.2% line (97/103)
+   and 82.4% branch (28/34), with the tick and signal-handler bodies
+   never run. I got 100% line (91/91) and 91.7% branch (22/24), with
+   both bodies run 3 times each. Only one of the three arms is still
+   unproven.
 
 **Reproduction Evidence**
 
-- **Commit showing reproduction:** [link to commit in your fork]
-- **Screenshots/logs:** [if applicable]
-- **My findings:** [what you discovered during reproduction; an
-  honest, evidenced cannot-reproduce that led you to re-pick or ask
-  the maintainer belongs here and costs you nothing]
+- **Commit showing reproduction:** no commit needed. The reproduction
+  is a coverage measurement on unchanged upstream `main`, at
+  https://github.com/SaxonWolcott/Nimbus/commit/7350b29e28c6142015e20b330a619e49038ac276
+- **Screenshots/logs:**
+
+  ```text
+  318 pass / 1 skip / 0 fail, 644 expect() calls (319 tests across 22 files)
+  SF:packages/gateway/src/db/latency-ring-buffer.ts
+  LF:91  LH:91  BRF:24  BRH:22   (no DA:<line>,0 lines)
+  ```
+
+  | Arm removed | Result |
+  |---|---|
+  | interval tick | 36 pass, 1 fail ("a tick whose flush throws is swallowed...") |
+  | signal handler | 36 pass, 1 fail ("a flush that throws inside the signal handler is swallowed...") |
+  | flush in `stop()` | 37 pass, 0 fail |
+
+- **My findings:** the issue only partly reproduces. A third test file
+  the issue doesn't mention, `src/db/latency-ring-buffer.coverage.test.ts`,
+  was added by the maintainer in #1603 (merged 2026-10-04), two months
+  after he wrote the issue. It drives the tick with fake timers, calls
+  the signal handler directly, and breaks inserts with a
+  `RAISE(ABORT)` trigger, so those two arms are already covered and
+  red-proven. The file has also shifted (the issue's lines 211-225 are
+  now 194-208). The one gap left is the flush inside `stop()`: removing
+  its `try`/`catch` fails no test, so the issue's third acceptance item
+  ("A test proves `stop()` swallows a flush error (and still removes
+  its listeners)") is still unmet. My claim had promised all three
+  arms, so I'm narrowing my contribution to that one arm and asking the
+  maintainer whether he still wants it.
 
 **Toolkit**
 
-- Tool:
-- What it produced:
-- Difficulties:
-- What changed:
+- Tool: repro-check with the wild scope, run as
+  `claude "repro-check: grade my claim comment in claim-draft.md and my repro report in repro-draft.md for issue <URL>"`.
+- What it produced: first a reject, because `claim-specific` failed:
+  my posted claim promised to confirm a baseline and cover three arms
+  that my own report showed were mostly done already. After I added a
+  correction and one question to the top of the report, it accepted,
+  with every required check passing.
+- Difficulties: the claim was already posted, so the grader was
+  grading a comment I couldn't change; the only fix was to correct it
+  in the next one. It also said up front that it didn't re-run my
+  coverage numbers, so my Actual output is the only evidence for them.
+- What changed: I put the correction at the top of the report, noted
+  the line shift so readers don't think the issue or I got the lines
+  wrong, and reworded one flat statement about sqlite-vec to say it
+  came from the warning.
 
 ---
 
