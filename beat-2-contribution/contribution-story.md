@@ -162,26 +162,59 @@ Claim comment: https://github.com/nimbus-agent/Nimbus/issues/976#issuecomment-67
 
 **Problem Description**
 
-[In your own words, what is broken or missing?]
+Nimbus buffers query-latency samples in memory and flushes them to
+SQLite from `startLatencyFlushScheduler`, which has three flush
+triggers: a 30-second timer, the SIGTERM/SIGINT handlers, and a final
+flush inside `stop()` at shutdown. Each one wraps the flush in a
+`try`/`catch`, because losing telemetry must never crash the gateway or
+abort shutdown. The issue says no test proves any of those catches
+works. Nothing is broken in the product; what's missing is a test that
+would fail if someone made one of those catches rethrow.
 
 **Expected Behavior**
 
-[What should happen?]
+Each error arm has a test that makes the flush genuinely throw (a
+sample in the buffer and a database write that fails) and checks the
+error is swallowed. Removing any one `try`/`catch` should make a test
+fail. For `stop()`, the test should also check that its SIGTERM and
+SIGINT listeners are still removed when the flush throws.
 
 **Current Behavior**
 
-[What actually happens?]
+On `main` (`7350b29e`), two of the three arms already have that test:
+#1603 added `latency-ring-buffer.coverage.test.ts`, which proves the
+tick and the signal handler. The `stop()` arm doesn't: if I delete its
+`try`/`catch`, all 37 latency-ring-buffer tests still pass, because no
+test makes the flush inside `stop()` throw.
 
 **Affected Components**
 
-[Which parts of the codebase are involved?]
+- `packages/gateway/src/db/latency-ring-buffer.ts`:
+  `startLatencyFlushScheduler` and its `stop()`, plus
+  `flushLatencyBuffer`, whose two early returns (table missing, empty
+  buffer) don't throw.
+- `packages/gateway/src/db/latency-ring-buffer.coverage.test.ts`: the
+  file that already proves the tick and signal arms, with the
+  `breakInserts()` trigger helper.
+- `packages/gateway/src/db/latency-ring-buffer.test.ts`: the older
+  `startLatencyFlushScheduler` tests, which call `stop()` only against
+  a healthy database.
+- `packages/gateway/src/platform/assemble.ts:522`: the one production
+  call site, which I won't change.
 
 **Toolkit**
 
-- Tool:
-- What it produced:
-- Difficulties:
-- What changed:
+- Tool: Claude Code in my Nimbus clone, with `CLAUDE.local.md` loaded,
+  reading the four files above and the lcov output from my
+  reproduction.
+- What it produced: the four answers above, and the finding that the
+  issue's problem is two-thirds solved on main.
+- Difficulties: the issue text was written before #1603, so its line
+  numbers, coverage numbers and "never runs in a test" statements were
+  all out of date. Taken at face value, it would have had me build a
+  seam and tests that already exist.
+- What changed: I wrote these answers from what main does today, not
+  from the issue text, and narrowed the work to the `stop()` arm.
 
 ---
 
@@ -278,67 +311,183 @@ search, so it didn't matter.
 
 **Analysis**
 
-[Your analysis of the root cause: what is causing the issue, traced
-to the files and functions involved.]
+In `packages/gateway/src/db/latency-ring-buffer.ts`, `startLatencyFlushScheduler(db)` returns a
+`stop()` that clears the 30-second timer, removes its SIGTERM and SIGINT listeners, then calls
+`flushLatencyBuffer(db, latencyRingBuffer)` inside a `try`/`catch` (`/* ignore */`). That catch has
+never caught anything in a test. The existing `stop()` calls in `latency-ring-buffer.test.ts` run
+against a healthy in-memory database, and the `afterEach` in `latency-ring-buffer.coverage.test.ts`
+calls `stop()` only after its tests have emptied the buffer or dropped the failing trigger.
+`flushLatencyBuffer` returns early, without touching the database, when the buffer is empty or
+the `query_latency_log` table is missing, so none of those calls reaches the `catch`. I confirmed
+this on main (`7350b29e`): deleting the `try`/`catch` in `stop()` leaves all 37 latency-ring-buffer
+tests passing, while deleting the tick's or the signal handler's catch fails one test each (those
+two arms were covered by #1603).
 
 **Proposed Solution**
 
-[High-level description of your fix approach, and what you are
-deliberately NOT changing.]
+Add one test to `latency-ring-buffer.coverage.test.ts`, next to the tick and signal tests, using
+that file's existing `breakInserts()` trigger and `push()` helper: start the scheduler, push a
+sample, make inserts fail, then call `stop()` and assert that it does not throw, that the failed
+sample was not written, and that the SIGTERM and SIGINT listener counts are back to what they were
+before the scheduler started. Update the file's header comment to say it covers the third arm too.
+
+What I won't change: `latency-ring-buffer.ts` itself (no new options or seams are needed, since
+`stop()` is already reachable from a test), the `assemble.ts` call site, the older
+`latency-ring-buffer.test.ts`, and the two arms #1603 already covers. Branch coverage should stay
+at 22/24, because I add no branches.
 
 **Implementation Plan**
 
-1. [Modify file X to do Y]
-2. [Add or change Z]
-3. [Update tests]
+1. Create a branch `test/976-stop-flush-error` from `main` in my fork's clone.
+2. In `packages/gateway/src/db/latency-ring-buffer.coverage.test.ts`, add a `describe` for the
+   flush inside `stop()` with one test: record the SIGTERM/SIGINT listener counts, start the
+   scheduler, `breakInserts()`, `push()` one sample, then expect `stop()` not to throw, expect
+   `logged()` to be empty, and expect both listener counts to equal the recorded ones. Keep the
+   scheduler in a local variable, not the file-level `scheduler`, so the `afterEach` doesn't stop it
+   twice.
+3. Update the file's header comment to name the third trigger.
+4. Red-prove: delete the `try`/`catch` in `stop()`, confirm the new test fails, restore it, confirm
+   it passes.
+5. Run the manifest checks (`bun run typecheck`, `bun run lint`, the db tests,
+   `bun run preflight:fast`) and the issue's Istanbul coverage command, and record before and
+   after numbers in test_evidence.md.
 
-[Record deviations here as they happen: what changed mid-build and
-why. A recorded deviation is honest work; silent drift is not.]
+**Unknowns**
+
+- The maintainer hasn't answered whether he wants the narrowed scope or would rather close the
+  issue. CONTRIBUTING makes assignment a hard gate only in high-traffic periods, so I'm building
+  now and will say in the PR that the tick and signal items were already covered by #1603.
+- The 22/24 branch figure is my own Istanbul run on Windows ARM64 at `7350b29e`, not the issue's
+  older 28/34. CONTRIBUTING says the coverage floor is CI-Linux-authoritative, so CI's number is
+  the one that counts. Since the change adds no branches, I expect no change there, but I haven't
+  confirmed it on Linux.
+- The test reads `process.listenerCount`, which other test files could change if they ran in the
+  same process. The count is taken right before `startLatencyFlushScheduler` and compared right
+  after `stop()`, so only a listener added between those two lines would affect it.
+
+Deviation (2026-11-07): step 2 originally said to clear the file-level
+`scheduler` variable after the test. While writing it, I kept the
+scheduler in a local variable instead, which never touches the
+`afterEach` and is simpler. Same behavior; plan.md is updated to match.
 
 **Toolkit**
 
-- Tool:
-- What it produced:
-- Difficulties:
-- What changed:
+- Tool: plan-check with the wild scope, run from my clone as
+  `claude "plan-check: grade my plan in plan.md and draft comment in plan-comment.md for issue <URL>"`.
+- What it produced: accept on the first run, with all six required
+  checks passing. Before grading, it checked the plan's claims against
+  main: #1603's helpers exist, and the `afterEach` really does call
+  `stop()` again. The one preferred check it failed was
+  `unknowns-stated`, because the plan had no risks section and stated
+  "22/24 branches" without saying where that number came from.
+- Difficulties: it advised me not to build until the maintainer
+  answers or assigns me, which conflicts with my plan to keep moving.
+  It also pointed out a gap in my own procedure: it doesn't say what to
+  do when the posted repro has no expected/actual lines, so it fell
+  back on the red-prove result in my plan.
+- What changed: I added an Unknowns section covering the unanswered
+  maintainer question, the 22/24 figure being my own Windows run and
+  not CI's, and the listener-count risk. I kept building, because
+  CONTRIBUTING makes assignment a hard gate only in high-traffic
+  periods; I'll say in the PR that the tick and signal arms were
+  already covered.
 
 ---
 
 ## Testing Strategy
 
-[What observable checks prove the fix: your reproduction steps re-run
-against the built change (before and after), and the repo's own test
-suite or checks with the outcome shown. "Tests pass" with nothing
-observable named is not a strategy.]
+The fix is a test, so the proof is that the test can fail: my
+reproduction's red-prove step, re-run on the branch.
+
+1. **Red-prove the `stop()` arm, before and after.** I deleted the
+   `try`/`catch` around the flush in `stop()` and ran
+   `bun test src/db/latency-ring-buffer` from `packages/gateway`.
+   - Before (main `7350b29e`): 37 pass, 0 fail. Nothing notices.
+   - After (branch `8bdcb3b9`): 37 pass, 1 fail. The new test fails with
+     `expect(received).not.toThrow()`.
+   - With the catch restored on the branch: 38 pass, 0 fail.
+2. **Coverage with the issue's Istanbul command.** Before and after,
+   the file stays at 91/91 lines and 22/24 branches. The flush line in
+   `stop()` (line 218) goes from 8 hits to 9. I expected the numbers not
+   to move: the line already ran, and Istanbul doesn't count a
+   `try`/`catch` as a branch. So this shows the change adds no branches
+   to risk the 80% floor, not that it raises coverage.
+3. **The repo's own checks from my ship manifest,** run on the branch in
+   a fresh `cmd` shell:
+   - `bun run typecheck`: exit 0
+   - `bun run lint`: exit 0 (4529 files checked, no fixes)
+   - `bun test packages/gateway/src/db packages/gateway/test/unit/db`:
+     394 pass, 3 skip, 0 fail (main: 393 pass)
+   - `bun run preflight:fast`: "preflight PASSED", all 37 gates green
+
+These are Windows ARM64 runs. CONTRIBUTING says the coverage floor is
+decided only by CI on Linux, so the PR's CI run is the final word on
+coverage.
 
 **Toolkit**
 
-- Tool:
-- What it produced:
-- Difficulties:
-- What changed:
+- Tool: Bun's test runner and the issue's Istanbul preloads, driven
+  from Claude Code, plus a small Python script that deletes exactly one
+  `try`/`catch` for the red-prove and `git checkout` to restore it.
+- What it produced: the before and after table above, saved with the
+  full outputs in `test_evidence.md` in my clone.
+- Difficulties: the coverage numbers can't show this fix, since line
+  and branch coverage were already as high as they'll go for this
+  file. Only the red-prove shows the difference. Running the checks
+  "in a fresh shell" on Windows also meant rebuilding PATH from the
+  registry, because my session's PATH didn't have Bun.
+- What changed: I made the red-prove the main evidence and reported the
+  coverage numbers as unchanged instead of trying to show a gain.
 
 ---
 
 ## Implementation Notes
 
-[A running log, added to as you work. Date each entry. What you
-built, decisions you made when you made them, wrong turns included.]
+**2026-11-07: reproduced, and the scope shrank**
 
-**[Date]**
+Installed Bun 1.4.4 with winget and ran the issue's coverage command on
+main. Got 100% line and 91.7% branch, not the issue's 94.2% and 82.4%.
+Found `latency-ring-buffer.coverage.test.ts` from #1603, which already
+covers the tick and signal arms. Red-proving all three arms showed only
+the `stop()` catch is unproven. Posted a correction on #976 asking
+whether the maintainer wants the narrower scope, and decided to keep
+building rather than wait, since CONTRIBUTING makes assignment a hard
+gate only in busy periods.
 
-[Entry]
+**2026-11-07: ship-gate setup and two Windows fixes**
 
-**[Date]**
+Installed the ship-gate and patched its hook and `check_gate.py` to
+also watch PowerShell, as I did for the voice guard. Wrote the ship
+manifest from CONTRIBUTING's "Before Opening a PR" list. Testing it in
+a fresh shell, `preflight:fast` failed with "Executable not found:
+bunx" because the winget package ships only `bun.exe`; I added
+`bunx.exe` as a hardlink to it, the way Bun's own installer does.
 
-[Entry]
+**2026-11-07: plan, then the test**
+
+plan-check accepted the plan. Created `test/976-stop-flush-error` and
+added one test to `latency-ring-buffer.coverage.test.ts`, reusing its
+`breakInserts()` trigger and `push()` helper, and updated its header
+comment. Decision: I kept the scheduler in a local variable instead of
+the file-level one, so the file's `afterEach` never stops it a second
+time (recorded as a deviation in Solution Approach). Red-proved it: with
+the `stop()` catch removed it fails, with it restored all 38 pass.
+Committed as `8bdcb3b9`, "test(gateway): prove stop() swallows a
+failing latency flush".
 
 **Toolkit**
 
-- Tool:
-- What it produced:
-- Difficulties:
-- What changed:
+- Tool: Claude Code in my clone, with `CLAUDE.local.md` loaded, writing
+  the test against the existing helpers in the #1603 test file.
+- What it produced: one 15-line test and a two-line comment update in
+  one commit, with no change to the source file.
+- Difficulties: the first draft of my plan reused the file-level
+  `scheduler` variable, which the file's `afterEach` stops again. I
+  also had to remember that `flushLatencyBuffer` returns early on an
+  empty buffer, so the test had to push a sample after
+  `breakInserts()` or it would never reach the catch.
+- What changed: I switched to a local variable, recorded that as a
+  deviation, and updated `plan.md` to match.
 
 ---
 
