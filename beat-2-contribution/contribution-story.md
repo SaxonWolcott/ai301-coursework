@@ -11,7 +11,7 @@ files and no evidence uploads are part of Assignment 5.
 **Student:** Saxon Wolcott
 **GitHub Username:** SaxonWolcott
 **Issue:** https://github.com/nimbus-agent/Nimbus/issues/976
-**Pull Request:** not opened yet
+**Pull Request:** https://github.com/nimbus-agent/Nimbus/pull/1938
 
 One repository, built across units 5 to 8, telling the whole story of your real
 contribution. Fill it as you work, not at the end — the sections below ask for evidence that
@@ -82,10 +82,17 @@ own CLAUDE.md instead. I also skipped the orientation agent, since the
 subsystem is only four files, read them directly instead, and kept the notes
 to 46 lines.
 
-**Unit 7: [one line on the tool work]**
+**Unit 7: installed the ship-gate, wrote its manifest, and opened my PR through it**
 
-[2-4 sentences: the ship-gate and your gate manifest. What it produced
-on your real branch, what fought you, what changed because of it.]
+Like the voice guard, the ship-gate only watched the Bash tool, so I
+extended its hook and `check_gate.py` to PowerShell. My manifest uses
+the four checks CONTRIBUTING lists before a PR (typecheck, lint, the
+db tests and `preflight:fast`) and excludes the full suite and the
+Linux-only coverage floor with dated reasons. Testing it in a fresh
+shell exposed a missing `bunx` from the winget install, which I fixed
+with a hardlink, and the gate's first run failed only because my
+session's PATH predated Bun. After that it passed every check plus my
+pr-precheck, and the hook honored that pass when I opened PR #1938.
 
 **Unit 8: [one line on the tool work]**
 
@@ -493,27 +500,53 @@ failing latency flush".
 
 ## Pull Request
 
-**PR Link:** [GitHub PR URL when opened]
+**PR Link:** https://github.com/nimbus-agent/Nimbus/pull/1938
 
-**PR Description:** [what the PR says; much of the content above
-adapts into it]
+**PR Description:** "test(gateway): prove stop() swallows a failing
+latency flush", opened 2026-11-07 from my fork's
+`test/976-stop-flush-error` into `main`, filled in on the repo's PR
+template. The Summary says it adds the missing test for the third
+error-isolation arm, the flush inside `stop()`: it pushes a sample,
+breaks inserts with the file's `breakInserts()` trigger, and checks
+that `stop()` doesn't throw, writes nothing, and still removes its
+SIGTERM and SIGINT listeners, with no source changes. A scope note says
+#1603 had already covered the tick and signal arms, so this PR covers
+only the one acceptance item still open, and links `Fixes #976`. The
+Coverage section reports 91/91 lines and 22/24 branches before and
+after, and why they don't move. Testing pastes the red-prove (catch
+removed: 0 fail on main, 1 fail on the branch; restored: 38 pass) and
+the typecheck, lint, db tests and `preflight:fast` results. Notes for
+Reviewers explain the local scheduler variable and disclose that I
+used Claude Code to read the code, draft the test and run the checks,
+and that I reviewed and ran everything myself.
 
 **Maintainer Feedback:**
 
-- [Date]: [feedback received, or "none yet"; silence is a normal
-  state and costs you nothing]
-- [Date]: [how you addressed it]
+- 2026-11-07: none yet. Two bots replied: CodeRabbit posted its
+  automated review, and the CLA Assistant asked me to sign the CLA.
+  CI is waiting for the maintainer to approve the first run.
 
-**Status:** [Awaiting review / Iterating / Merged / Closed. The
-status is a fact you record, never a grade: the PR is graded as
-opened.]
+**Status:** Awaiting review
 
 **Toolkit**
 
-- Tool:
-- What it produced:
-- Difficulties:
-- What changed:
+- Tool: the ship-gate, run by hand as
+  `python3 ~/.claude/ship-gate/check_gate.py --branch --title "..." --body-file pr_draft.md`,
+  then through its hook when Claude Code ran `gh pr create`.
+- What it produced: a PASS. All four manifest checks passed
+  (typecheck 8s, lint 3s, db tests 6s, `preflight:fast` 55s), and my
+  pr-precheck accepted all ten checks, from `diff-within-plan` to
+  `title-clear`. When I opened the PR six minutes later, the hook
+  honored that pass instead of rerunning, and the voice guard passed
+  the description.
+- Difficulties: the first manual run stopped with
+  `'bun' is not recognized`, because my terminal session started
+  before winget added Bun to PATH. That was a false failure, not my
+  code. pr-precheck also flagged that I'm still unassigned and suggested
+  `Relates to #976` instead of `Fixes`.
+- What changed: I reran with Bun on PATH and it passed. I kept `Fixes`,
+  because this test is the last open acceptance item and the Summary
+  says so.
 
 ---
 
