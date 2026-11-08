@@ -94,10 +94,18 @@ with a hardlink, and the gate's first run failed only because my
 session's PATH predated Bun. After that it passed every check plus my
 pr-precheck, and the hook honored that pass when I opened PR #1938.
 
-**Unit 8: [one line on the tool work]**
+**Unit 8: installed the PR monitor and wrote a playbook from Nimbus's real response times**
 
-[2-4 sentences: the PR-monitor and your playbook. What it read, what it
-drafted, what you did with the draft.]
+The first full run refused to draft because my playbook was still the
+blank template, which is the right call. To set the staleness numbers,
+I looked for outside-contributor PRs and found only three in the last
+thousand (#1856, #1328, #978); each got a maintainer response in under
+a day, so with CONTRIBUTING's 72-hour promise I set a 5-day nudge
+threshold. On PR #1938 the monitor labeled the state FEEDBACK-IN
+because two bots had commented, but its draft correctly read the
+thread, said there was nothing to reply to, and gave Nov 13 as the
+earliest nudge. I posted nothing, and I'd teach the state check to
+skip bot comments.
 
 ---
 
@@ -522,9 +530,13 @@ and that I reviewed and ran everything myself.
 
 **Maintainer Feedback:**
 
-- 2026-11-07: none yet. Two bots replied: CodeRabbit posted its
-  automated review, and the CLA Assistant asked me to sign the CLA.
-  CI is waiting for the maintainer to approve the first run.
+- 2026-11-07: none yet from the maintainer. Two bots replied:
+  CodeRabbit posted a notice that it doesn't auto-review this repo,
+  and the CLA Assistant asked me to sign the CLA. CI is waiting for the
+  maintainer to approve the first run.
+- 2026-11-07: I read the CLA and signed it on the PR with the exact
+  comment the bot asked for, and the CLA check now shows me as signed.
+  The PR monitor's draft said to wait, so I posted nothing else.
 
 **Status:** Awaiting review
 
@@ -554,25 +566,67 @@ and that I reviewed and ran everything myself.
 
 **Technical Skills Gained**
 
-[What you learned technically, named concretely.]
+- Measuring coverage with Istanbul preloads under Bun, and reading an
+  lcov record (`LF`/`LH`, `BRF`/`BRH`, `DA:<line>,<hits>`). I also
+  learned why a `try`/`catch` can be fully "covered" yet never tested:
+  Istanbul doesn't count it as a branch, and the line runs either way.
+- Red-proving a test: delete the code under test, watch the test fail,
+  restore it. It was the only evidence that showed what my change did.
+- Forcing a real SQLite failure in a test with a
+  `BEFORE INSERT ... RAISE(ABORT)` trigger instead of a mock, and
+  watching for early returns (empty buffer, missing table) that let a
+  test pass without reaching the code it claims to test.
+- Fake timers in `bun:test` (`jest.useFakeTimers()`,
+  `advanceTimersByTime`) and checking signal-listener counts to prove
+  cleanup, from reading the #1603 tests.
+- How Claude Code hooks work: a PreToolUse hook reads the tool call as
+  JSON on stdin and exits 2 to block it, and the `matcher` decides
+  which tools it sees.
 
 **Challenges Overcome**
 
-[What was hard and how you solved it; point at the real events, the
-Toolkit blocks above are full of them.]
+- Finding an issue that was actually free. Most good-first-issues
+  already had linked PRs or claims in comments, and my first claim
+  (yamada-ui#7988) was taken over by the maintainer two days later. I
+  added `-linked:pr` to my queries, filtered the course site's issues
+  through the GitHub API, and re-picked with my patched rubric.
+- The issue didn't reproduce as written. #1603 had already covered
+  two of its three arms. Instead of building what the issue described,
+  I red-proved each arm, posted a correction on the thread, and
+  narrowed my PR to the one arm still open.
+- Windows kept breaking tools written for Bash: symlinks, `$HOME` in
+  hook commands, Claude Code using PowerShell instead of Bash, a
+  missing `bunx`, and a stale PATH that made the ship-gate fail on
+  `bun` not found. I fixed each one where it broke and logged it in the
+  Toolkit entries.
 
 **What I'd Do Differently Next Time**
 
-[Reflection on your process.]
+- Check the file's history before trusting an issue's numbers.
+  `git log` on the test folder would have shown #1603 in seconds, and
+  I'd have claimed with the right scope instead of correcting myself
+  in a second comment.
+- Claim only after running the baseline. My claim promised to confirm
+  numbers I hadn't measured yet, and repro-check rightly failed it.
+- Wait a little longer between asking the maintainer a question and
+  opening a PR. I opened #1938 about an hour after asking whether he
+  wanted the narrower scope, because of my deadline; next time I'd
+  leave the 72 hours his CONTRIBUTING promises.
 
 ---
 
 ## Resources Used
 
-[What actually helped, not a reading list. List things this story
-already shows you using: the doc you followed to set the environment
-up, the thread that explained the bug, the person who answered you.
-One real entry beats ten plausible ones.]
-
-- [Link to documentation that helped]
-- [Discussion, issue, or post that helped]
+- Issue #976 itself, especially its "Measuring coverage" and "Making
+  the flush actually throw" sections, which gave me the exact Istanbul
+  command and the trigger idea:
+  https://github.com/nimbus-agent/Nimbus/issues/976
+- PR #1603 and its `latency-ring-buffer.coverage.test.ts`, the tests
+  that already covered two arms and whose `breakInserts()` helper my
+  test reuses: https://github.com/nimbus-agent/Nimbus/pull/1603
+- Nimbus's docs/CONTRIBUTING.md, for setup, the checks in my ship
+  manifest, the assignment rule and the CLA:
+  https://github.com/nimbus-agent/Nimbus/blob/main/docs/CONTRIBUTING.md
+- The closed PR #978, which showed the earlier attempt at this issue
+  and why it was withdrawn (the CLA):
+  https://github.com/nimbus-agent/Nimbus/pull/978
